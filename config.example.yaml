@@ -1,0 +1,47 @@
+# QFNUScoreReminder CLI 配置模板
+# 复制本文件为 config.yaml 后编辑使用：cp config.example.yaml config.yaml
+# config.yaml 已加入 .gitignore，不会上传
+
+# 全局探测间隔（分钟），仅 --watch 模式生效，可被 --interval 覆盖
+# 建议 >= 5，过小可能触发教务系统账号锁定
+interval_minutes: 5
+
+# 默认学期，可被单用户覆盖
+# 格式：YYYY-YYYY-X
+semester: "2024-2025-2"
+
+# 全局默认通知渠道：用户未配对应渠道时回退使用
+# 整体可选；但若列了某渠道，每一项的 token/secret 或 webhook_url/secret 必填
+defaults:
+  dingtalk:
+    - token: "global_dingtalk_token_1"
+      secret: "global_dingtalk_secret_1"
+    # 可配多个，逐个发送
+    # - token: "global_dingtalk_token_2"
+    #   secret: "global_dingtalk_secret_2"
+  feishu:
+    - webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/global1"
+      secret: "global_feishu_secret_1"
+
+# 用户列表（至少 1 个）
+# 同一 account 不可重复
+# account 必须匹配 ^[A-Za-z0-9_-]{4,32}$（防路径注入）
+users:
+  # 用户 1：明文密码（仅本地测试用，生产强烈不推荐）
+  - account: "20240001"
+    password: "plain_password_only_for_local_test"
+    # semester: "2024-2025-2"  # 可选，缺省取顶层 semester
+    # 用户级钉钉（可选，覆盖默认）
+    dingtalk:
+      - token: "user_dingtalk_token_1"
+        secret: "user_dingtalk_secret_1"
+    # 用户级飞书（可选，覆盖默认）
+    feishu:
+      - webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/user1"
+        secret: "user_feishu_secret_1"
+
+  # 用户 2：环境变量引用密码（生产推荐）
+  # 环境变量需在启动前设置：export USER_20240002_PASSWORD=your_real_password
+  - account: "20240002"
+    password: "ENV:USER_20240002_PASSWORD"
+    # 未配 dingtalk/feishu，回退到 defaults

@@ -170,3 +170,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# CLI 化新增：运行时配置与数据
+config.yaml
+data/
+.env

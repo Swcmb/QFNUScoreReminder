@@ -1,88 +1,242 @@
 # QFNUScoreReminder
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![GitHub stars](https://img.shields.io/github/stars/W1ndys/QFNUScoreReminder?style=social)
-![GitHub forks](https://img.shields.io/github/forks/W1ndys/QFNUScoreReminder?style=social)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-**曲阜师范大学教务系统成绩监控**  
-检测到新有成绩出来之后会上报
+**曲阜师范大学教务系统成绩监控 CLI**
 
-#### 点击链接加入群聊【Easy-QFNU ｜曲师大选课指北群】：https://qm.qq.com/q/xDrtQHMDNm
-
-#### 点击链接加入群聊【Easy-QFNU ｜曲师大选课指北群 2】：https://qm.qq.com/q/Zw6GRHucim
-关注微信公众号获取更多内容
-
-![img](https://picx.zhimg.com/80/v2-a42b58d3c6fa27d3ebe03b7090a7cf63.jpeg)
-## 效果展示
-
-![效果](https://pica.zhimg.com/80/v2-ab040cb6e2c97cd56de73d09777c4f07.png)
+检测到新成绩后通过钉钉 / 飞书机器人通知。支持多用户、多 webhook、可配置探测间隔、一次性 / 守护进程两种模式。
 
 ---
 
-## 使用方法
+## 特性
 
-使用教程：[点击这里](https://blog.w1ndys.top/posts/4fee17c4)
+- **CLI 工具**：`qfnu-score` 命令，安装后即可使用
+- **多用户**：一份配置文件管理多个教务系统账号
+- **多钉钉 / 多飞书通知**：每个用户可配独立 webhook，未配时回退到全局默认
+- **双模式**：默认一次性执行；`--watch` 进入守护进程按间隔循环探测
+- **可配置间隔**：通过 `config.yaml` 或 `--interval` 设置，建议 ≥ 5 分钟
+- **原子写入**：成绩状态按用户分文件存储，进程中断不会产生半截 JSON
+- **环境变量密码**：支持 `ENV:VAR_NAME` 引用，密码不进仓库
 
-### 1. Fork 项目
+---
 
-[W1ndys/QFNUScoreReminder: 曲阜师范大学教务系统成绩监控，检测到新有成绩出来之后会上报](https://github.com/W1ndys/QFNUScoreReminder)
+## 安装
 
-点击链接进入 Github，fork 本项目到自己的仓库。
+```bash
+git clone https://github.com/Swcmb/QFNUScoreReminder.git
+cd QFNUScoreReminder
+git checkout feat/cli-multiuser
 
-![Fork 项目](https://pica.zhimg.com/80/v2-01a15518704c6c8af91cf05cd843c795.png)
+pip install -r requirements.txt
+pip install -e .                    # 注册 qfnu-score 命令
+cp config.example.yaml config.yaml  # 复制模板
+```
 
-### 2. 新增钉钉机器人
+要求 Python 3.10–3.13（受 `ddddocr` 支持范围约束）。
 
-- 去钉钉新建一个自己的群。
-- 进入群设置 > 机器人，添加一个自定义 webhook 机器人。
-- 记录配置的 `webhook` 和 `secret`（不要泄露）。
+---
 
-例如，如果你的 webhook 是 `https://oapi.dingtalk.com/robot/send?access_token=xxx` ，那么：
+## 配置
 
-- `DD_BOT_TOKEN` 就是 `xxx`
-- `DD_BOT_SECRET` 就是 `secret`
+编辑 `config.yaml`：
 
-![钉钉机器人](https://pica.zhimg.com/80/v2-99e91c06e71ac28cbed199f9e4321896.png)
+```yaml
+# 全局探测间隔（分钟），仅 --watch 模式生效
+# 建议 >= 5，过小可能触发教务系统账号锁定
+interval_minutes: 5
 
-### 3. 新增飞书机器人（可选）
+# 默认学期
+semester: "2024-2025-2"
 
-- 访问飞书开放平台，创建一个自定义机器人。
-- 记录配置的 `webhook` 和 `secret`（不要泄露）。
+# 全局默认通知（用户未配时回退使用）
+defaults:
+  dingtalk:
+    - token: "global_dingtalk_token"
+      secret: "global_dingtalk_secret"
+  feishu:
+    - webhook_url: "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+      secret: "global_feishu_secret"
 
-- `FEISHU_BOT_URL` 就是 `https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxx`
-- `FEISHU_BOT_SECRET` 就是验证关键词，自己自定义的
+# 用户列表
+users:
+  - account: "20240001"
+    password: "ENV:USER_20240001_PASSWORD"   # 推荐用环境变量
+  - account: "20240002"
+    password: "ENV:USER_20240002_PASSWORD"
+    dingtalk:                                 # 用户级覆盖默认
+      - token: "user_dingtalk_token"
+        secret: "user_dingtalk_secret"
+```
 
-### 4. 配置环境变量
+### 钉钉机器人获取
 
-进入设置配置环境变量。
+1. 钉钉群 → 群设置 → 机器人 → 添加自定义 webhook 机器人
+2. 安全设置选「加签」，记录 `webhook` 与 `secret`
+3. webhook URL 中 `access_token=xxx` 的 `xxx` 即为 `token`
 
-![配置环境变量](https://pica.zhimg.com/80/v2-e24e61d04f7bfdde25ce104f2a016c5d.png)
+### 飞书机器人获取
 
-分别配置以下环境变量：
+1. 飞书开放平台 → 创建自定义机器人
+2. 记录 `webhook` 与签名校验 `secret`
 
-- `DD_BOT_SECRET` 和 `DD_BOT_TOKEN`：钉钉机器人配置的 `webhook` 和 `secret`
-- `FEISHU_BOT_URL` 和 `FEISHU_BOT_SECRET`：飞书机器人配置的 `webhook` 和 `secret`
-- `USER_ACCOUNT` 和 `USER_PASSWORD`：教务系统账号密码
-- `SEMESTER`：学期信息，格式为 `YYYY-YYYY-X`（例如：`2024-2025-2`），默认为 `2024-2025-2`
+### 密码处理
 
-### 5. 运行
+`password` 字段支持两种写法：
 
-点击 `Run workflow` 按钮，运行项目。如果配置正确，会收到钉钉和飞书消息。
+- **明文**（仅本地测试）：`password: "my_password"`
+- **环境变量引用**（生产推荐）：`password: "ENV:USER_20240001_PASSWORD"`，启动前设置 `export USER_20240001_PASSWORD=your_real_password`
 
-![运行项目](https://pica.zhimg.com/80/v2-7c49b45057d28dec0b33b9b7b37bc108.png)
+也可用 `.env` 文件，CLI 启动时会自动加载（`python-dotenv`）。
 
-收到消息，说明配置成功并且初始化成功。
+---
 
-程序会每 5 分钟检查一次成绩，有新成绩会发送消息。
+## 使用
+
+### 一次性执行（探测一次后退出）
+
+```bash
+qfnu-score
+```
+
+### 守护进程模式（按间隔循环探测）
+
+```bash
+qfnu-score --watch
+qfnu-score --watch --interval 10     # 覆盖配置间隔
+```
+
+`Ctrl+C` 优雅退出，输出累计统计（成功数 / 失败数 / 新增成绩数 / 总耗时 / 轮数）。
+
+### 仅运行指定用户
+
+```bash
+qfnu-score --user 20240001
+qfnu-score --user 20240001 --user 20240002   # 多个
+```
+
+### Dry-run（只检测不通知、不写存储）
+
+```bash
+qfnu-score --dry-run
+```
+
+### 详细日志
+
+```bash
+qfnu-score -v          # DEBUG 级
+qfnu-score --verbose
+```
+
+### 查看版本
+
+```bash
+qfnu-score --version
+```
+
+---
+
+## 退出码
+
+| 码 | 含义 |
+|---|---|
+| 0 | 全部用户成功 |
+| 1 | 配置错误（文件缺失/格式错误/参数冲突/`--user` 不存在） |
+| 2 | 系统级不可达（0 用户成功 + 全部为网络错误） |
+| 3 | 部分或全部用户级失败（登录/验证码等） |
+
+> `--watch` 模式收到信号退出时固定返回 0。
+
+---
+
+## 部署建议
+
+### systemd（Linux 服务器）
+
+```ini
+# /etc/systemd/system/qfnu-score.service
+[Unit]
+Description=QFNU Score Reminder
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/QFNUScoreReminder
+EnvironmentFile=/opt/QFNUScoreReminder/.env
+ExecStart=/opt/QFNUScoreReminder/.venv/bin/qfnu-score --watch
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now qfnu-score
+# 查看日志
+journalctl -u qfnu-score -f
+```
+
+### 日志滚动
+
+`--watch` 长跑建议重定向到文件并配合 `logrotate`：
+
+```bash
+qfnu-score --watch >> /var/log/qfnu-score.log 2>&1
+```
+
+---
+
+## 开发
+
+### 运行测试
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+### 项目结构
+
+```
+qfnu_score/
+├── cli.py          # click 入口
+├── config.py       # 配置加载与校验
+├── monitor.py      # 编排逻辑
+├── jwxt.py         # 教务系统客户端
+├── captcha.py      # ddddocr 单例
+├── dingtalk.py     # 钉钉发送
+├── feishu.py       # 飞书发送
+└── store.py        # 成绩持久化
+tests/              # 单元测试
+docs/superpowers/specs/  # 设计文档
+```
+
+---
+
+## 风险声明
+
+- 教务系统为 HTTP 明文，密码传输有被嗅探风险，建议在可信网络环境运行
+- 短间隔守护模式 + 密码错误配置可能导致账号被教务系统锁定，建议 `interval_minutes` ≥ 5
+- 登录流程变更（如新增滑块、改 CAS SSO）视为超出本期范围
+
+---
 
 ## 更新日志
+
+### 2026-07-12 — CLI 化与多用户支持
+
+- 重构为 Python CLI 工具 `qfnu-score`，移除 GitHub Actions 工作流
+- 支持多用户配置（YAML），每用户独立成绩状态文件
+- 支持多钉钉 / 多飞书 webhook，用户级 + 全局默认回退
+- 双模式：一次性执行与 `--watch` 守护进程
+- 密码支持 `ENV:` 环境变量引用
+- 原子写入、日志脱敏、超长消息拆分
+- 完整单元测试覆盖
 
 ### 2025-01-17
 
 - 更新了获取全部学期的总学分和平均绩点
 - 更新了计算本学期绩点
-- 更新了保存成绩和绩点数据
-- 新增 `SEMESTER` 环境变量，用于自定义查询的学期，格式为 `YYYY-YYYY-X`
-
-你可以在 [output.txt](output.txt) 文件中查看成绩和绩点数据。
+- 新增 `SEMESTER` 环境变量

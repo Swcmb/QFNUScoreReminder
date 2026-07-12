@@ -3,5 +3,7 @@ requests
 Pillow
 beautifulsoup4
 ddddocr
-python-dotenv
+python-dotenv        # 保留：cli.py 入口处 load_dotenv()，便于本地 .env 调试
 lxml
+pyyaml               # CLI 化新增
+click                # CLI 化新增
